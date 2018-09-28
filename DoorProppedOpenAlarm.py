@@ -10,9 +10,10 @@ movementCutoff = 100
 colorDifferenceCutoff = 40
 numFramesToWait = 300
 def playAlarm():
-	print("Playing sound!")
-	segment = AudioSegment.from_ogg("out.ogg")
-	play(segment)
+	print("Door was left open!  Playing alarm...")
+	sound = zerorpc.Client()
+	sound.connect("tcp://10.0.8.20:4242")
+	sound.door_left_open()
 
 dilation = cv.getStructuringElement(cv.MORPH_ELLIPSE, (2, 2));
 erosion = cv.getStructuringElement(cv.MORPH_ELLIPSE, (6, 6));
