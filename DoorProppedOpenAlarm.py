@@ -7,12 +7,17 @@ rightDoorMask = (673, 268, 90, 230)
 expectedDoorColor = (73, 103, 115, 0)
 movementCutoff = 100
 colorDifferenceCutoff = 20
-numFramesToWait = 300
+numFramesToWait = 500
+isPlaying = False
 def playAlarm():
 	print("Door was left open!  Playing alarm...")
 	sound = zerorpc.Client()
 	sound.connect("tcp://10.0.8.20:4242")
 	sound.door_left_open()
+def stopAlarm():
+	sound = zerorpc.Client()
+	sound.connect("tcp://10.0.8.20:4242")
+	sound.door_closed()
 
 dilation = cv.getStructuringElement(cv.MORPH_ELLIPSE, (2, 2));
 erosion = cv.getStructuringElement(cv.MORPH_ELLIPSE, (6, 6));
@@ -61,15 +66,20 @@ while True:
 		timeSinceLastMovement += 1
 
 	if rightDoorDifference < colorDifferenceCutoff and leftDoorDifference < colorDifferenceCutoff:
+		if isPlaying:
+			isPlaying = False
+			stopAlarm()
 		timeSinceLastClosed = 0
 	else:
 		timeSinceLastClosed += 1
 
 	if timeSinceLastMovement > numFramesToWait and timeSinceLastClosed > numFramesToWait:
-		playAlarm()
+		if not isPlaying:
+			playAlarm()
+			isPlaying = True
 		timeSinceLastClosed = 0
 		timeSinceLastMovement = 0
-	if count % 100 == 0:
+	if count % numFramesToWait == 0:
 		print(f"Last Movement: {timeSinceLastMovement}, Last Closed: {timeSinceLastClosed}")
 		print(f"Diff: {diff}, Left Door Diff: {leftDoorDifference}, Right Door Diff: {rightDoorDifference}");
 		print(f"Left: {leftDoorColor}, Right: {rightDoorColor}")
