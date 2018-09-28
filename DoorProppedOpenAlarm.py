@@ -2,11 +2,11 @@ import cv2 as cv
 import math
 import zerorpc
 
-leftDoorMask = (440, 270, 90, 230)
-rightDoorMask = (540, 270, 90, 230)
-expectedDoorColor = (73, 113, 115, 0)
+leftDoorMask = (578, 268, 90, 230)
+rightDoorMask = (673, 268, 90, 230)
+expectedDoorColor = (73, 103, 115, 0)
 movementCutoff = 100
-colorDifferenceCutoff = 40
+colorDifferenceCutoff = 20
 numFramesToWait = 300
 def playAlarm():
 	print("Door was left open!  Playing alarm...")
@@ -69,8 +69,10 @@ while True:
 		playAlarm()
 		timeSinceLastClosed = 0
 		timeSinceLastMovement = 0
-	print(f"Last Movement: {timeSinceLastMovement}, Last Closed: {timeSinceLastClosed}")
-	#print(f"Diff: {diff}, Left Door Diff: {leftDoorDifference}, Right Door Diff: {rightDoorDifference}");
+	if count % 100 == 0:
+		print(f"Last Movement: {timeSinceLastMovement}, Last Closed: {timeSinceLastClosed}")
+		print(f"Diff: {diff}, Left Door Diff: {leftDoorDifference}, Right Door Diff: {rightDoorDifference}");
+		print(f"Left: {leftDoorColor}, Right: {rightDoorColor}")
 
 	# cv.imshow("Left door", leftDoor)
 	# cv.imshow("Right door", rightDoor)
