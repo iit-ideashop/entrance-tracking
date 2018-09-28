@@ -7,7 +7,7 @@ rightDoorMask = (673, 268, 90, 230)
 expectedDoorColor = (73, 103, 115, 0)
 movementCutoff = 100
 colorDifferenceCutoff = 20
-numFramesToWait = 500
+numFramesToWait = 300
 isPlaying = False
 def playAlarm():
 	print("Door was left open!  Playing alarm...")
@@ -61,7 +61,12 @@ while True:
 	rightDoorDifference = getColorDifference(rightDoorColor, expectedDoorColor)
 
 	if diff > movementCutoff:
-		timeSinceLastMovement = 0
+		if isPlaying:
+			isPlaying = False
+			stopAlarm()
+			timeSinceLastMovement = (numFramesToWait * 2) / 3
+		else:
+			timeSinceLastMovement = 0
 	else:
 		timeSinceLastMovement += 1
 
@@ -84,10 +89,10 @@ while True:
 		print(f"Diff: {diff}, Left Door Diff: {leftDoorDifference}, Right Door Diff: {rightDoorDifference}");
 		print(f"Left: {leftDoorColor}, Right: {rightDoorColor}")
 
-	# cv.imshow("Left door", leftDoor)
-	# cv.imshow("Right door", rightDoor)
+	cv.imshow("Left door", leftDoor)
+	cv.imshow("Right door", rightDoor)
 
-	# cv.imshow("Image", img)
-	# key = cv.waitKey(1) & 0xFF
-	# if (key == ord("q")):
-	# 	break
+	cv.imshow("Image", img)
+	key = cv.waitKey(1) & 0xFF
+	if (key == ord("q")):
+		break
