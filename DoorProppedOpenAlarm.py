@@ -1,7 +1,6 @@
 import cv2 as cv
 import math
-from pydub import AudioSegment
-from pydub.playback import play
+import zerorpc
 
 leftDoorMask = (440, 270, 90, 230)
 rightDoorMask = (540, 270, 90, 230)
