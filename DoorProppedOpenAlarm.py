@@ -41,13 +41,18 @@ timeSinceLastMovement = 0
 timeSinceLastClosed = 0
 grey = ()
 prevGrey = ()
+lastConnection = count
 
 while True:
 	count += 1
 	prevGrey = grey
 	grabbed, img = camera.read()
 	if not grabbed:
-		break
+		# Try to reconnect
+		print("Lost connection to camera.  Trying to reconnect, retry #" + str(count - lastConnection))
+		camera = cv.VideoCapture("rtsp://10.0.8.21/live1.sdp")
+		continue
+	lastConnection = count
 	grey = cv.cvtColor(img, cv.COLOR_RGB2GRAY)
 	if count == 0: continue
 
@@ -64,9 +69,7 @@ while True:
 		if isPlaying:
 			isPlaying = False
 			stopAlarm()
-			timeSinceLastMovement = (numFramesToWait * 2) / 3
-		else:
-			timeSinceLastMovement = 0
+		timeSinceLastMovement = 0
 	else:
 		timeSinceLastMovement += 1
 
