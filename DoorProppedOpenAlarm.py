@@ -89,10 +89,10 @@ while True:
 		print(f"Diff: {diff}, Left Door Diff: {leftDoorDifference}, Right Door Diff: {rightDoorDifference}");
 		print(f"Left: {leftDoorColor}, Right: {rightDoorColor}")
 
-	cv.imshow("Left door", leftDoor)
-	cv.imshow("Right door", rightDoor)
+	# cv.imshow("Left door", leftDoor)
+	# cv.imshow("Right door", rightDoor)
 
-	cv.imshow("Image", img)
-	key = cv.waitKey(1) & 0xFF
-	if (key == ord("q")):
-		break
+	# cv.imshow("Image", img)
+	# key = cv.waitKey(1) & 0xFF
+	# if (key == ord("q")):
+	# 	break
