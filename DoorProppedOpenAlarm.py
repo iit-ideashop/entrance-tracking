@@ -31,7 +31,7 @@ def cropImage(a, crop):
 	return a[crop[1]:crop[1]+crop[3], crop[0]:crop[0]+crop[2]]
 
 camera = cv.VideoCapture("rtsp://10.0.8.21/live1.sdp")
-count = 0
+count = -1
 timeSinceLastMovement = 0
 timeSinceLastClosed = 0
 grey = ()
@@ -44,7 +44,7 @@ while True:
 	if not grabbed:
 		break
 	grey = cv.cvtColor(img, cv.COLOR_RGB2GRAY)
-	if count == 1: continue
+	if count == 0: continue
 
 	diff = getDifference(grey, prevGrey)
 
