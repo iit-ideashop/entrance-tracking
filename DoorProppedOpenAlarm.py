@@ -4,9 +4,13 @@ import zerorpc
 
 leftDoorMask = (578, 268, 90, 230)
 rightDoorMask = (673, 268, 90, 230)
-expectedDoorColor = (73, 103, 115, 0)
+expectedDoorColors = [
+	(73, 103, 115, 0), # Lights on
+	(51, 83, 97, 0), # Some lights on
+	(37, 51, 60, 0) # Lights off
+]
 movementCutoff = 100
-colorDifferenceCutoff = 20
+colorDifferenceCutoff = 30
 numFramesToWait = 300
 isPlaying = False
 def playAlarm():
@@ -62,8 +66,6 @@ while True:
 	rightDoor = cropImage(img, rightDoorMask)
 	leftDoorColor = cv.mean(leftDoor)
 	rightDoorColor = cv.mean(rightDoor)
-	leftDoorDifference = getColorDifference(leftDoorColor, expectedDoorColor)
-	rightDoorDifference = getColorDifference(rightDoorColor, expectedDoorColor)
 
 	if diff > movementCutoff:
 		if isPlaying:
@@ -73,7 +75,15 @@ while True:
 	else:
 		timeSinceLastMovement += 1
 
-	if rightDoorDifference < colorDifferenceCutoff and leftDoorDifference < colorDifferenceCutoff:
+	bestLeftDoorDifference = 1000
+	bestRightDoorDifference = 1000
+	for expectedColor in expectedDoorColors:
+		leftDoorDifference = getColorDifference(leftDoorColor, expectedColor)
+		rightDoorDifference = getColorDifference(rightDoorColor, expectedColor)
+		bestLeftDoorDifference = min(bestLeftDoorDifference, leftDoorDifference)
+		bestRightDoorDifference = min(bestRightDoorDifference, rightDoorDifference)
+
+	if bestLeftDoorDifference < colorDifferenceCutoff and bestRightDoorDifference < colorDifferenceCutoff:
 		if isPlaying:
 			isPlaying = False
 			stopAlarm()
@@ -87,9 +97,9 @@ while True:
 			isPlaying = True
 		timeSinceLastClosed = 0
 		timeSinceLastMovement = 0
-	if count % numFramesToWait == 0:
+	if count % (numFramesToWait // 2) == 0:
 		print(f"Last Movement: {timeSinceLastMovement}, Last Closed: {timeSinceLastClosed}")
-		print(f"Diff: {diff}, Left Door Diff: {leftDoorDifference}, Right Door Diff: {rightDoorDifference}");
+		print(f"Diff: {diff}, Left Door Diff: {bestLeftDoorDifference}, Right Door Diff: {bestRightDoorDifference}");
 		print(f"Left: {leftDoorColor}, Right: {rightDoorColor}")
 
 	# cv.imshow("Left door", leftDoor)
