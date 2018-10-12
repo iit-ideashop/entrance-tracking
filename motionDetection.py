@@ -22,7 +22,7 @@ if len(sys.argv) > 2: # Can be passed as the second argument as well
 
 # Person must be moving in the same direction for this amount of pixels before a notice is played
 requiredTimeToActivate = 0.2
-requiredDistanceToActivate = 100 # Pixels
+requiredDistanceToActivate = 150 # Pixels
 # The same notice won't be played more than once ever this number of seconds
 minTimeBetweenPlays = 6
 # Function that is run if a person is detected walking in the positive direction (from left to right in camera view)
@@ -35,6 +35,14 @@ def playSoundMovingNegative():
 	segment = AudioSegment.from_ogg("audio/in.ogg")
 	play(segment)
 
+videoWidth = video.get(cv.CAP_PROP_FRAME_WIDTH)
+videoHeight = video.get(cv.CAP_PROP_FRAME_HEIGHT)
+areaModifier = (videoWidth * videoHeight) / (1920 * 1080)
+distanceModifier = videoWidth / 1920
+
+maxDistanceDifference *= distanceModifier
+minSize *= areaModifier
+requiredDistanceToActivate *= distanceModifier
 
 _, last = video.read()
 last = cv.cvtColor(last, cv.COLOR_BGR2GRAY)
