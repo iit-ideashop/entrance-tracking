@@ -12,7 +12,7 @@ print("Using camera " + str(camera))
 video = cv.VideoCapture(camera)
 ## Configuration
 # Box comparison options
-maxDistanceDifference = 100 # Maximum movement between centers of two boxes for them to be considered as the same box moving (anything that moves more than this in one frame will be considered as two separate boxes) 
+maxDistanceDifference = 200 # Maximum movement between centers of two boxes for them to be considered as the same box moving (anything that moves more than this in one frame will be considered as two separate boxes)
 maxPctAreaDifference = 0.5 # Maximum change in area between two boxes for them to be considered as the same box.  This is a percentage, if the smaller box is less than this fraction in area of the bigger box, it will be considered.
 
 # Person detection options
@@ -20,8 +20,9 @@ minSize = 20000 # The minimum size of a box for it to be considered a person
 if len(sys.argv) > 2: # Can be passed as the second argument as well
 	minSize = float(sys.argv[2])
 
-# Person must be moving in the same direction for this amount of time before a notice is played
+# Person must be moving in the same direction for this amount of pixels before a notice is played
 requiredTimeToActivate = 0.2
+requiredDistanceToActivate = 100 # Pixels
 # The same notice won't be played more than once ever this number of seconds
 minTimeBetweenPlays = 6
 # Function that is run if a person is detected walking in the positive direction (from left to right in camera view)
@@ -40,26 +41,34 @@ last = cv.cvtColor(last, cv.COLOR_BGR2GRAY)
 lastContours = []
 lastPlay = 0
 class ChangeTracker:
-	def __init__(self, timeToActivate, minTimeBetweenPlays):
-		self.timeToActivate = timeToActivate
+	def __init__(self, distanceToActivate, minTimeBetweenPlays):
+		self.distanceToActivate = distanceToActivate
 		self.minTimeBetweenPlays = minTimeBetweenPlays
 		self.OKStart = time.time()
 		self.lastPlay = 0
+		self.totalDist = 0
 
-	def update(self, ok):
-		if not ok:
-			self.OKStart = time.time()
+	def update(self, distance):
+		if distance == 0:
+			self.distance = 0
+		else:
+			self.distance += distance
 
 	def shouldActivate(self):
+		dist = self.distance
+		target = self.distanceToActivate
+		if target < 0:
+			target = -target
+			dist = -dist
 		if (time.time() - self.lastPlay) < self.minTimeBetweenPlays:
 			return False
-		if (time.time() - self.OKStart) > self.timeToActivate:
+		if dist > target:
 			self.lastPlay = time.time()
 			return True
 		else:
 			return False
-negTracker = ChangeTracker(requiredTimeToActivate, minTimeBetweenPlays)
-posTracker = ChangeTracker(requiredTimeToActivate, minTimeBetweenPlays)
+negTracker = ChangeTracker(-requiredDistanceToActivate, minTimeBetweenPlays)
+posTracker = ChangeTracker(requiredDistanceToActivate, minTimeBetweenPlays)
 
 # Compare two images and return a array of interesting looking boxes (spots with large amounts of movement)
 def compareImages(img1, img2):
@@ -82,7 +91,7 @@ def areSimilar(box1, box2):
 	else:
 		areaDiff = area1 / area2
 	if areaDiff < maxPctAreaDifference:
-		print(f"Area cutoff, {areaDiff} < {maxPctAreaDifference}")
+		print("Area cutoff, {0} < {1}".format(areaDiff, maxPctAreaDifference))
 		return None
 	(x1, y1, w1, h1) = cv.boundingRect(box1)
 	(x2, y2, w2, h2) = cv.boundingRect(box2)
@@ -94,7 +103,7 @@ def areSimilar(box1, box2):
 	movementy = center2y - center1y
 	distance = math.sqrt(movementx ** 2 + movementy ** 2)
 	if distance > maxDistanceDifference:
-		print(f"Distance cutoff, {distance} > {maxDistanceDifference}")
+		print("Distance cutoff, {0} > {1}".format(distance, maxDistanceDifference))
 		return None
 	print("Matched")
 	return ((center1x, center1y), (center2x, center2y))
@@ -103,12 +112,12 @@ def areSimilar(box1, box2):
 def checkAndPlaySound():
 	if posTracker.shouldActivate():
 		playSoundMovingPositive()
-		posTracker.update(False)
-		negTracker.update(False)
+		posTracker.update(0)
+		negTracker.update(0)
 	elif negTracker.shouldActivate():
 		playSoundMovingNegative()
-		posTracker.update(False)
-		negTracker.update(False)
+		posTracker.update(0)
+		negTracker.update(0)
 	
 
 while True:
@@ -124,6 +133,7 @@ while True:
 		# Draw boxes
 		cv.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
+	distance = 0
 	foundPos = False
 	foundNeg = False
 	for lastBox in lastContours:
@@ -137,8 +147,9 @@ while True:
 			else:
 				cv.arrowedLine(img, points[0], points[1], (0, 0, 255), thickness=2)
 				foundNeg = True
-	negTracker.update(foundNeg)
-	posTracker.update(foundPos)
+			distance += (points[0][0] - points[1][0])
+	negTracker.update(distance)
+	posTracker.update(distance)
 	checkAndPlaySound()
 
 	cv.imshow("Final", img)
