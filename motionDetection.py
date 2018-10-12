@@ -3,8 +3,7 @@ import sys
 import math
 import time
 import os
-from pydub import AudioSegment
-from pydub.playback import play
+import pygame
 
 # Pass camera as first program argument
 camera = int(sys.argv[1])
@@ -15,6 +14,10 @@ video = cv.VideoCapture(camera)
 maxDistanceDifference = 200 # Maximum movement between centers of two boxes for them to be considered as the same box moving (anything that moves more than this in one frame will be considered as two separate boxes)
 maxPctAreaDifference = 0.5 # Maximum change in area between two boxes for them to be considered as the same box.  This is a percentage, if the smaller box is less than this fraction in area of the bigger box, it will be considered.
 
+pygame.mixer.init()
+outSegment = pygame.mixer.Sound("audio/out.ogg")
+inSegment = pygame.mixer.Sound("audio/in.ogg")
+
 # Person detection options
 minSize = 20000 # The minimum size of a box for it to be considered a person
 if len(sys.argv) > 2: # Can be passed as the second argument as well
@@ -22,18 +25,16 @@ if len(sys.argv) > 2: # Can be passed as the second argument as well
 
 # Person must be moving in the same direction for this amount of pixels before a notice is played
 requiredTimeToActivate = 0.2
-requiredDistanceToActivate = 150 # Pixels
+requiredDistanceToActivate = 100 # Pixels
 # The same notice won't be played more than once ever this number of seconds
 minTimeBetweenPlays = 6
 # Function that is run if a person is detected walking in the positive direction (from left to right in camera view)
 def playSoundMovingPositive():
 	print("Playing sound!")
-	segment = AudioSegment.from_ogg("audio/out.ogg")
-	play(segment)
+	outSegment.play()
 # Function that is run if a person is detected walking in the negative direction (from right to left in camera view)
 def playSoundMovingNegative():
-	segment = AudioSegment.from_ogg("audio/in.ogg")
-	play(segment)
+	inSegment.play()
 
 videoWidth = video.get(cv.CAP_PROP_FRAME_WIDTH)
 videoHeight = video.get(cv.CAP_PROP_FRAME_HEIGHT)
