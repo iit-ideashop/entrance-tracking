@@ -11,12 +11,12 @@ requiredDistanceToActivate = 100 # Pixels
 # The same notice won't be played more than once ever this number of seconds
 minTimeBetweenPlays = 6 # Seconds
 # To avoid detecting people walking away from the computer
-posDirectionCutoff = 960
-negDirectionCutoff = 960
+posDirectionCutoff = 1080
+negDirectionCutoff = 840
 # Box comparison options
 maxDistanceDifference = 200 # Maximum movement between centers of two boxes for them to be considered as the same box moving (anything that moves more than this in one frame will be considered as two separate boxes)
 maxPctAreaDifference = 0.5 # Maximum change in area between two boxes for them to be considered as the same box.  This is a percentage, if the smaller box is less than this fraction in area of the bigger box, it will be considered.
-minHeight = 300 # Anyone higher than this in the video will be ignored (note that OpenCV coordinates are from the top left, so 0 is the most permissive).  This is to remove people who are close to the camera, people far from the camera will be near the center while people close to the camera will extend higher.
+minHeight = 100 # Anyone higher than this in the video will be ignored (note that OpenCV coordinates are from the top left, so 0 is the most permissive).  This is to remove people who are close to the camera, people far from the camera will be near the center while people close to the camera will extend higher.
 # Person detection options
 minSize = 20000 # The minimum size of a box for it to be considered a person
 
@@ -28,8 +28,8 @@ parser.add_argument("--max-distance", dest="maxDistance", type=int, default=maxD
 parser.add_argument("--max-area-diff", dest="maxAreaDiff", type=float, default=maxPctAreaDifference, help="The maximum change in area between two boxes for them to be considered as the same box")
 parser.add_argument("--min-time", dest="minTime", type=float, default=minTimeBetweenPlays, help="The minimum time between consecutive playback of the same sound")
 parser.add_argument("--required-distance", dest="requiredDistance", type=int, default=requiredDistanceToActivate, help="The amount of movement in 1080p pixels to activate a sound")
-parser.add_argument("--pos-cutoff", dest="posCutoff", type=int, default=posDirectionCutoff, help="The last point to count someone walking in the positive direction")
-parser.add_argument("--neg-cutoff", dest="negCutoff", type=int, default=negDirectionCutoff, help="The last point to count someone walking in the negative direction")
+parser.add_argument("--pos-cutoff", dest="posCutoff", type=int, default=posDirectionCutoff, help="The last point to count someone walking in the positive direction.  Smaller numbers are more sensitive.")
+parser.add_argument("--neg-cutoff", dest="negCutoff", type=int, default=negDirectionCutoff, help="The last point to count someone walking in the negative direction.  Bigger numbers are more sensitive.")
 parser.add_argument("--verbose", "-v", dest="verbose", action="store_true", help="Verbose mode")
 parser.add_argument("--live", "-l", dest="live", action="store_true", help="Enables live camera feed window")
 args = parser.parse_args(sys.argv[1:])
@@ -88,11 +88,13 @@ class ChangeTracker:
 		self.OKStart = time.time()
 		self.lastPlay = 0
 		self.totalDist = 0
+		self.pos = 0
 
-	def update(self, distance):
+	def update(self, distance, pos):
 		if distance == 0:
 			self.distance = 0
 		else:
+			self.pos = pos
 			self.distance += distance
 
 	def shouldActivate(self):
@@ -104,6 +106,13 @@ class ChangeTracker:
 		if (time.time() - self.lastPlay) < self.minTimeBetweenPlays:
 			return False
 		if dist > target:
+			if target < 0 and self.pos < negDirectionCutoff or target > 0 and self.pos > posDirectionCutoff:
+				if verbose:
+					if target < 0:
+						print("Negative Cutoff, {0} < {1}".format(self.pos, negDirectionCutoff))
+					else:
+						print("Positive Cutoff, {0} > {1}".format(self.pos, posDirectionCutoff))
+					return False
 			self.lastPlay = time.time()
 			return True
 		else:
@@ -157,12 +166,12 @@ def areSimilar(box1, box2):
 def checkAndPlaySound():
 	if posTracker.shouldActivate():
 		playSoundMovingPositive()
-		posTracker.update(0)
-		negTracker.update(0)
+		posTracker.update(0, 0)
+		negTracker.update(0, 0)
 	elif negTracker.shouldActivate():
 		playSoundMovingNegative()
-		posTracker.update(0)
-		negTracker.update(0)
+		posTracker.update(0, 0)
+		negTracker.update(0, 0)
 	
 
 while True:
@@ -178,8 +187,9 @@ while True:
 		# Draw boxes
 		cv.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-	distancePos = 0
-	distanceNeg = 0
+	distance = 0
+	highestPos = 0
+	lowestPos = 0
 	for lastBox in lastContours:
 		for curBox in contours:
 			points = areSimilar(lastBox, curBox)
@@ -188,16 +198,14 @@ while True:
 				continue
 			if (points[0][0] < points[1][0]):
 				cv.arrowedLine(img, points[0], points[1], (0, 255, 255), thickness=2)
-				if points[1][0] < posDirectionCutoff:
-					distancePos += (points[0][0] - points[1][0])
-				elif verbose: print("Positive Cutoff")
 			else:
 				cv.arrowedLine(img, points[0], points[1], (0, 0, 255), thickness=2)
-				if points[1][0] > negDirectionCutoff:
-					distanceNeg += (points[0][0] - points[1][0])
-				elif verbose: print("Negative Cutoff")
-	negTracker.update(distanceNeg)
-	posTracker.update(distancePos)
+			highestPos = max(highestPos, points[1][0])
+			lowestPos = min(lowestPos, points[1][0])
+			distance += (points[0][0] - points[1][0])
+					
+	negTracker.update(distance, highestPos)
+	posTracker.update(distance, lowestPos)
 	checkAndPlaySound()
 
 	last = gray
