@@ -3,25 +3,43 @@ import sys
 import math
 import time
 import os
-import pygame
+import argparse
 
-# Pass camera as first program argument
-camera = int(sys.argv[1])
-print("Using camera " + str(camera))
-video = cv.VideoCapture(camera)
 ## Configuration
 # Box comparison options
 maxDistanceDifference = 200 # Maximum movement between centers of two boxes for them to be considered as the same box moving (anything that moves more than this in one frame will be considered as two separate boxes)
 maxPctAreaDifference = 0.5 # Maximum change in area between two boxes for them to be considered as the same box.  This is a percentage, if the smaller box is less than this fraction in area of the bigger box, it will be considered.
+minHeight = 300 # Anyone higher than this in the video will be ignored (note that OpenCV coordinates are from the top left, so 0 is the most permissive).  This is to remove people who are close to the camera, people far from the camera will be near the center while people close to the camera will extend higher.
+# Person detection options
+minSize = 20000 # The minimum size of a box for it to be considered a person
 
+parser = argparse.ArgumentParser(description="Detect people and play sounds")
+parser.add_argument("camera", type=int, help="The OpenCV id of the camera to use")
+parser.add_argument("--min-size", dest="minSize", type=int, default=minSize, help="The minimum size of a box for it to be considered a person")
+parser.add_argument("--min-height", dest="minHeight", type=int, default=minHeight, help="The highest a box can go while still being considered (low numbers == high pixels)")
+parser.add_argument("--max-distance", dest="maxDistance", type=int, default=maxDistanceDifference, help="The maximum movement between centers of two boxes for them to be considered as the same box moving")
+parser.add_argument("--max-area-diff", dest="maxAreaDiff", type=float, default=maxPctAreaDifference, help="The maximum change in area between two boxes for them to be considered as the same box")
+parser.add_argument("--verbose", "-v", dest="verbose", action="store_true", help="Verbose mode")
+parser.add_argument("--live", "-l", dest="live", action="store_true", help="Enables live camera feed window")
+args = parser.parse_args(sys.argv[1:])
+verbose = args.verbose
+shouldCamera = args.live
+
+maxDistanceDifference = args.maxDistance
+maxPctAreaDifference = args.maxAreaDiff
+minHeight = args.minHeight
+minSize = args.minSize
+
+# Pass camera as first program argument
+camera = args.camera
+if verbose:
+	print("Using camera " + str(camera))
+video = cv.VideoCapture(camera)
+
+import pygame
 pygame.mixer.init()
 outSegment = pygame.mixer.Sound("audio/out.ogg")
 inSegment = pygame.mixer.Sound("audio/in.ogg")
-
-# Person detection options
-minSize = 20000 # The minimum size of a box for it to be considered a person
-if len(sys.argv) > 2: # Can be passed as the second argument as well
-	minSize = float(sys.argv[2])
 
 # Person must be moving in the same direction for this amount of pixels before a notice is played
 requiredTimeToActivate = 0.2
@@ -30,7 +48,7 @@ requiredDistanceToActivate = 100 # Pixels
 minTimeBetweenPlays = 6
 # Function that is run if a person is detected walking in the positive direction (from left to right in camera view)
 def playSoundMovingPositive():
-	print("Playing sound!")
+	if verbose: print("Playing sound!")
 	outSegment.play()
 # Function that is run if a person is detected walking in the negative direction (from right to left in camera view)
 def playSoundMovingNegative():
@@ -39,11 +57,13 @@ def playSoundMovingNegative():
 videoWidth = video.get(cv.CAP_PROP_FRAME_WIDTH)
 videoHeight = video.get(cv.CAP_PROP_FRAME_HEIGHT)
 areaModifier = (videoWidth * videoHeight) / (1920 * 1080)
-distanceModifier = videoWidth / 1920
+widthModifier = videoWidth / 1920
+heightModifier = videoHeight / 1080
 
-maxDistanceDifference *= distanceModifier
+maxDistanceDifference *= widthModifier
 minSize *= areaModifier
-requiredDistanceToActivate *= distanceModifier
+requiredDistanceToActivate *= widthModifier
+minHeight *= heightModifier
 
 _, last = video.read()
 last = cv.cvtColor(last, cv.COLOR_BGR2GRAY)
@@ -84,7 +104,7 @@ def compareImages(img1, img2):
 	diff = cv.absdiff(img1, img2)
 	thresh = cv.threshold(diff, 40, 255, cv.THRESH_BINARY)[1]
 	thresh = cv.dilate(thresh, None, iterations=2)
-	cv.imshow("Threshold", thresh)
+	if shouldCamera: cv.imshow("Threshold", thresh)
 	contours = [contour for contour in cv.findContours(thresh.copy(), cv.RETR_EXTERNAL,
 		cv.CHAIN_APPROX_SIMPLE)[1] if cv.contourArea(contour) > minSize]
 	return contours
@@ -95,15 +115,19 @@ def compareImages(img1, img2):
 def areSimilar(box1, box2):
 	area1 = cv.contourArea(box1)
 	area2 = cv.contourArea(box2)
+	if verbose: print("Box Area: {0}".format(area2))
 	if area1 > area2:
 		areaDiff = area2 / area1
 	else:
 		areaDiff = area1 / area2
 	if areaDiff < maxPctAreaDifference:
-		print("Area cutoff, {0} < {1}".format(areaDiff, maxPctAreaDifference))
+		if verbose: print("Area cutoff, {0} < {1}".format(areaDiff, maxPctAreaDifference))
 		return None
 	(x1, y1, w1, h1) = cv.boundingRect(box1)
 	(x2, y2, w2, h2) = cv.boundingRect(box2)
+	if y2 < minHeight:
+		if verbose: print("Height cutoff, {0} < {1}".format(y2, minHeight))
+		return None
 	center1x = (x1 + w1 // 2)
 	center1y = (y1 + h1 // 2)
 	center2x = (x2 + w2 // 2)
@@ -112,9 +136,9 @@ def areSimilar(box1, box2):
 	movementy = center2y - center1y
 	distance = math.sqrt(movementx ** 2 + movementy ** 2)
 	if distance > maxDistanceDifference:
-		print("Distance cutoff, {0} > {1}".format(distance, maxDistanceDifference))
+		if verbose: print("Distance cutoff, {0} > {1}".format(distance, maxDistanceDifference))
 		return None
-	print("Matched")
+	if verbose: print("Matched")
 	return ((center1x, center1y), (center2x, center2y))
 
 # Decide whether or not a sound should be played
@@ -161,9 +185,11 @@ while True:
 	posTracker.update(distance)
 	checkAndPlaySound()
 
-	cv.imshow("Final", img)
 	last = gray
 	lastContours = contours
-	key = cv.waitKey(1) & 0xFF
-	if key == ord("q"):
-		break
+
+	if shouldCamera:
+		cv.imshow("Final", img)
+		key = cv.waitKey(1) & 0xFF
+		if key == ord("q"):
+			break
