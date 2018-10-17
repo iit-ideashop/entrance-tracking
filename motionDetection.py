@@ -6,6 +6,10 @@ import os
 import argparse
 
 ## Configuration
+# Person must be moving in the same direction for this amount of pixels before a notice is played
+requiredDistanceToActivate = 100 # Pixels
+# The same notice won't be played more than once ever this number of seconds
+minTimeBetweenPlays = 6 # Seconds
 # Box comparison options
 maxDistanceDifference = 200 # Maximum movement between centers of two boxes for them to be considered as the same box moving (anything that moves more than this in one frame will be considered as two separate boxes)
 maxPctAreaDifference = 0.5 # Maximum change in area between two boxes for them to be considered as the same box.  This is a percentage, if the smaller box is less than this fraction in area of the bigger box, it will be considered.
@@ -19,6 +23,8 @@ parser.add_argument("--min-size", dest="minSize", type=int, default=minSize, hel
 parser.add_argument("--min-height", dest="minHeight", type=int, default=minHeight, help="The highest a box can go while still being considered (low numbers == high pixels)")
 parser.add_argument("--max-distance", dest="maxDistance", type=int, default=maxDistanceDifference, help="The maximum movement between centers of two boxes for them to be considered as the same box moving")
 parser.add_argument("--max-area-diff", dest="maxAreaDiff", type=float, default=maxPctAreaDifference, help="The maximum change in area between two boxes for them to be considered as the same box")
+parser.add_argument("--min-time", dest="minTime", type=float, default=minTimeBetweenPlays, help="The minimum time between consecutive playback of the same sound")
+parser.add_argument("--required-distance", dest="requiredDistance", type=int, default=requiredDistanceToActivate, help="The amount of movement in 1080p pixels to activate a sound")
 parser.add_argument("--verbose", "-v", dest="verbose", action="store_true", help="Verbose mode")
 parser.add_argument("--live", "-l", dest="live", action="store_true", help="Enables live camera feed window")
 args = parser.parse_args(sys.argv[1:])
@@ -29,6 +35,8 @@ maxDistanceDifference = args.maxDistance
 maxPctAreaDifference = args.maxAreaDiff
 minHeight = args.minHeight
 minSize = args.minSize
+minTimeBetweenPlays = args.minTime
+requiredDistanceToActivate = args.requiredDistance
 
 # Pass camera as first program argument
 camera = args.camera
@@ -41,18 +49,15 @@ pygame.mixer.init()
 outSegment = pygame.mixer.Sound("audio/out.ogg")
 inSegment = pygame.mixer.Sound("audio/in.ogg")
 
-# Person must be moving in the same direction for this amount of pixels before a notice is played
-requiredTimeToActivate = 0.2
-requiredDistanceToActivate = 100 # Pixels
-# The same notice won't be played more than once ever this number of seconds
-minTimeBetweenPlays = 6
 # Function that is run if a person is detected walking in the positive direction (from left to right in camera view)
 def playSoundMovingPositive():
-	if verbose: print("Playing sound!")
-	outSegment.play()
+	if verbose: print("Playing out sound!")
+	if not pygame.mixer.Channel(0).get_busy():
+		pygame.mixer.Channel(0).play(outSegment)
 # Function that is run if a person is detected walking in the negative direction (from right to left in camera view)
 def playSoundMovingNegative():
-	inSegment.play()
+	if verbose: print("Playing in sound!")
+	pygame.mixer.Channel(0).play(inSegment)
 
 videoWidth = video.get(cv.CAP_PROP_FRAME_WIDTH)
 videoHeight = video.get(cv.CAP_PROP_FRAME_HEIGHT)
