@@ -10,6 +10,9 @@ import argparse
 requiredDistanceToActivate = 100 # Pixels
 # The same notice won't be played more than once ever this number of seconds
 minTimeBetweenPlays = 6 # Seconds
+# To avoid detecting people walking away from the computer
+posDirectionCutoff = 960
+negDirectionCutoff = 960
 # Box comparison options
 maxDistanceDifference = 200 # Maximum movement between centers of two boxes for them to be considered as the same box moving (anything that moves more than this in one frame will be considered as two separate boxes)
 maxPctAreaDifference = 0.5 # Maximum change in area between two boxes for them to be considered as the same box.  This is a percentage, if the smaller box is less than this fraction in area of the bigger box, it will be considered.
@@ -25,6 +28,8 @@ parser.add_argument("--max-distance", dest="maxDistance", type=int, default=maxD
 parser.add_argument("--max-area-diff", dest="maxAreaDiff", type=float, default=maxPctAreaDifference, help="The maximum change in area between two boxes for them to be considered as the same box")
 parser.add_argument("--min-time", dest="minTime", type=float, default=minTimeBetweenPlays, help="The minimum time between consecutive playback of the same sound")
 parser.add_argument("--required-distance", dest="requiredDistance", type=int, default=requiredDistanceToActivate, help="The amount of movement in 1080p pixels to activate a sound")
+parser.add_argument("--pos-cutoff", dest="posCutoff", type=int, default=posDirectionCutoff, help="The last point to count someone walking in the positive direction")
+parser.add_argument("--neg-cutoff", dest="negCutoff", type=int, default=negDirectionCutoff, help="The last point to count someone walking in the negative direction")
 parser.add_argument("--verbose", "-v", dest="verbose", action="store_true", help="Verbose mode")
 parser.add_argument("--live", "-l", dest="live", action="store_true", help="Enables live camera feed window")
 args = parser.parse_args(sys.argv[1:])
@@ -69,6 +74,8 @@ maxDistanceDifference *= widthModifier
 minSize *= areaModifier
 requiredDistanceToActivate *= widthModifier
 minHeight *= heightModifier
+posDirectionCutoff *= widthModifier
+negDirectionCutoff *= widthModifier
 
 _, last = video.read()
 last = cv.cvtColor(last, cv.COLOR_BGR2GRAY)
@@ -171,23 +178,26 @@ while True:
 		# Draw boxes
 		cv.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-	distance = 0
-	foundPos = False
-	foundNeg = False
+	distancePos = 0
+	distanceNeg = 0
 	for lastBox in lastContours:
 		for curBox in contours:
 			points = areSimilar(lastBox, curBox)
+			tmpDistance = 0
 			if points == None:
 				continue
 			if (points[0][0] < points[1][0]):
 				cv.arrowedLine(img, points[0], points[1], (0, 255, 255), thickness=2)
-				foundPos = True
+				if points[1][0] < posDirectionCutoff:
+					distancePos += (points[0][0] - points[1][0])
+				elif verbose: print("Positive Cutoff")
 			else:
 				cv.arrowedLine(img, points[0], points[1], (0, 0, 255), thickness=2)
-				foundNeg = True
-			distance += (points[0][0] - points[1][0])
-	negTracker.update(distance)
-	posTracker.update(distance)
+				if points[1][0] > negDirectionCutoff:
+					distanceNeg += (points[0][0] - points[1][0])
+				elif verbose: print("Negative Cutoff")
+	negTracker.update(distanceNeg)
+	posTracker.update(distancePos)
 	checkAndPlaySound()
 
 	last = gray
