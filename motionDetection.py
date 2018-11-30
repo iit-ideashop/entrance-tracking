@@ -85,10 +85,11 @@ minHeight *= heightModifier
 posDirectionCutoff *= widthModifier
 negDirectionCutoff *= widthModifier
 
-_, last = video.read()
-last = cv.cvtColor(last, cv.COLOR_BGR2GRAY)
+bgsub = cv.bgsegm.createBackgroundSubtractorMOG(history=1000)
+
 lastContours = []
 lastPlay = 0
+
 class ChangeTracker:
 	def __init__(self, distanceToActivate, minTimeBetweenPlays):
 		self.distanceToActivate = distanceToActivate
@@ -137,6 +138,7 @@ def compareImages(img1, img2):
 	contours = [contour for contour in cv.findContours(thresh.copy(), cv.RETR_EXTERNAL,
 		cv.CHAIN_APPROX_SIMPLE)[1] if cv.contourArea(contour) > minSize]
 	return contours
+
 
 # Decides whether boxes from two consecutive frames are similar enough to be considered one box moving
 # If yes, returns a pair of the coordinates of their centers
@@ -187,8 +189,11 @@ while True:
 	if not grabbed:
 		break
 
-	gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-	contours = compareImages(last, gray)	
+	afterBGSub = bgsub.apply(img)
+	afterBGSub = cv.dilate(afterBGSub, None, iterations=int(8*widthModifier))
+	if shouldCamera: cv.imshow("No BG", afterBGSub)
+	contours = [contour for contour in cv.findContours(afterBGSub, cv.RETR_EXTERNAL,
+		cv.CHAIN_APPROX_SIMPLE)[1] if cv.contourArea(contour) > minSize]
 
 	for contour in contours:
 		(x, y, w, h) = cv.boundingRect(contour)
@@ -216,7 +221,6 @@ while True:
 	posTracker.update(distance, lowestPos)
 	checkAndPlaySound()
 
-	last = gray
 	lastContours = contours
 
 	if shouldCamera:
