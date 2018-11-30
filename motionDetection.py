@@ -30,6 +30,7 @@ parser.add_argument("--min-time", dest="minTime", type=float, default=minTimeBet
 parser.add_argument("--required-distance", dest="requiredDistance", type=int, default=requiredDistanceToActivate, help="The amount of movement in 1080p pixels to activate a sound")
 parser.add_argument("--pos-cutoff", dest="posCutoff", type=int, default=posDirectionCutoff, help="The last point to count someone walking in the positive direction.  Smaller numbers are more sensitive.")
 parser.add_argument("--neg-cutoff", dest="negCutoff", type=int, default=negDirectionCutoff, help="The last point to count someone walking in the negative direction.  Bigger numbers are more sensitive.")
+parser.add_argument("--reverse", "-r", dest="reverse", action="store_true", help="Reverse the directions needed for action sounds")
 parser.add_argument("--verbose", "-v", dest="verbose", action="store_true", help="Verbose mode")
 parser.add_argument("--live", "-l", dest="live", action="store_true", help="Enables live camera feed window")
 args = parser.parse_args(sys.argv[1:])
@@ -55,14 +56,21 @@ outSegment = pygame.mixer.Sound("audio/out.ogg")
 inSegment = pygame.mixer.Sound("audio/in.ogg")
 
 # Function that is run if a person is detected walking in the positive direction (from left to right in camera view)
-def playSoundMovingPositive():
+def playSoundMovingOut():
 	if verbose: print("Playing out sound!")
 	if not pygame.mixer.Channel(0).get_busy():
 		pygame.mixer.Channel(0).play(outSegment)
 # Function that is run if a person is detected walking in the negative direction (from right to left in camera view)
-def playSoundMovingNegative():
+def playSoundMovingIn():
 	if verbose: print("Playing in sound!")
 	pygame.mixer.Channel(0).play(inSegment)
+
+if args.reverse:
+	playSoundMovingPositive = playSoundMovingIn
+	playSoundMovingNegative = playSoundMovingOut
+else:
+	playSoundMovingPositive = playSoundMovingOut
+	playSoundMovingNegative = playSoundMovingIn
 
 videoWidth = video.get(cv.CAP_PROP_FRAME_WIDTH)
 videoHeight = video.get(cv.CAP_PROP_FRAME_HEIGHT)
