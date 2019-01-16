@@ -3,6 +3,7 @@ import sys
 import math
 import time
 import os
+import subprocess
 import argparse
 
 ## Configuration
@@ -55,13 +56,20 @@ pygame.mixer.init()
 outSegment = pygame.mixer.Sound("audio/out.ogg")
 inSegment = pygame.mixer.Sound("audio/in.ogg")
 
+def wakeMonitor():
+	env = os.environ.copy()
+	env["DISPLAY"] = ":0"
+	subprocess.Popen(["xset", "s", "reset"], env=env)
+
 # Function that is run if a person is detected walking in the positive direction (from left to right in camera view)
 def playSoundMovingOut():
+	wakeMonitor()
 	if verbose: print("Playing out sound!")
 	if not pygame.mixer.Channel(0).get_busy():
 		pygame.mixer.Channel(0).play(outSegment)
 # Function that is run if a person is detected walking in the negative direction (from right to left in camera view)
 def playSoundMovingIn():
+	wakeMonitor()
 	if verbose: print("Playing in sound!")
 	pygame.mixer.Channel(0).play(inSegment)
 
