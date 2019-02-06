@@ -22,7 +22,7 @@ minHeight = 100 # Anyone higher than this in the video will be ignored (note tha
 minSize = 20000 # The minimum size of a box for it to be considered a person
 
 parser = argparse.ArgumentParser(description="Detect people and play sounds")
-parser.add_argument("camera", type=int, help="The OpenCV id of the camera to use")
+parser.add_argument("camera", type=str, help="The OpenCV id of the camera to use")
 parser.add_argument("--min-size", dest="minSize", type=int, default=minSize, help="The minimum size of a box for it to be considered a person")
 parser.add_argument("--min-height", dest="minHeight", type=int, default=minHeight, help="The highest a box can go while still being considered (low numbers == high pixels)")
 parser.add_argument("--max-distance", dest="maxDistance", type=int, default=maxDistanceDifference, help="The maximum movement between centers of two boxes for them to be considered as the same box moving")
@@ -46,7 +46,10 @@ minTimeBetweenPlays = args.minTime
 requiredDistanceToActivate = args.requiredDistance
 
 # Pass camera as first program argument
-camera = args.camera
+try:
+	camera = int(args.camera)
+except ValueError:
+	camera = args.camera
 if verbose:
 	print("Using camera " + str(camera))
 video = cv.VideoCapture(camera)
@@ -190,7 +193,11 @@ def checkAndPlaySound():
 		playSoundMovingNegative()
 		posTracker.update(0, 0)
 		negTracker.update(0, 0)
-	
+
+def addColoredBox(img, x0, x1, y0, y1, color, alpha):
+	box = img.copy()
+	cv.rectangle(box, (x0, y0), (x1, y1), color, -1)
+	cv.addWeighted(box, alpha, img, 1-alpha, 0, img)
 
 while True:
 	grabbed, img = video.read()
@@ -215,9 +222,9 @@ while True:
 		for curBox in contours:
 			points = areSimilar(lastBox, curBox)
 			tmpDistance = 0
-			if points == None:
+			if points is None:
 				continue
-			if (points[0][0] < points[1][0]):
+			if points[0][0] < points[1][0]:
 				cv.arrowedLine(img, points[0], points[1], (0, 255, 255), thickness=2)
 			else:
 				cv.arrowedLine(img, points[0], points[1], (0, 0, 255), thickness=2)
@@ -232,6 +239,8 @@ while True:
 	lastContours = contours
 
 	if shouldCamera:
+		addColoredBox(img, int(posDirectionCutoff), int(videoWidth), 0, int(videoHeight), (0, 0, 255), 0.1)
+		addColoredBox(img, 0, int(negDirectionCutoff), 0, int(videoHeight), (0, 255, 255), 0.1)
 		cv.imshow("Final", img)
 		key = cv.waitKey(1) & 0xFF
 		if key == ord("q"):
