@@ -217,7 +217,7 @@ while True:
 
 	distance = 0
 	highestPos = 0
-	lowestPos = 0
+	lowestPos = videoWidth
 	for lastBox in lastContours:
 		for curBox in contours:
 			points = areSimilar(lastBox, curBox)
