@@ -5,8 +5,8 @@ class FloatRange:
 	def __init__(self, low: float, high: float):
 		if low > high:
 			raise ValueError("Tried to create a FloatRange with low {0} greater than high {0}".format(low, high))
-		self.low: float = low
-		self.high: float = high
+		self.low = low
+		self.high = high
 
 	@staticmethod
 	def fromStringWithDefaults(string: str, low: Optional[float] = None, high: Optional[float] = None) -> "FloatRange":
