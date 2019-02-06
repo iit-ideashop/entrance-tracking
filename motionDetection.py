@@ -5,15 +5,14 @@ import time
 import os
 import subprocess
 import argparse
+from typing import Tuple
+from floatRange import FloatRange
 
 ## Configuration
 # Person must be moving in the same direction for this amount of pixels before a notice is played
 requiredDistanceToActivate = 100 # Pixels
 # The same notice won't be played more than once ever this number of seconds
 minTimeBetweenPlays = 6 # Seconds
-# To avoid detecting people walking away from the computer
-posDirectionCutoff = 1080
-negDirectionCutoff = 840
 # Box comparison options
 maxDistanceDifference = 200 # Maximum movement between centers of two boxes for them to be considered as the same box moving (anything that moves more than this in one frame will be considered as two separate boxes)
 maxPctAreaDifference = 0.5 # Maximum change in area between two boxes for them to be considered as the same box.  This is a percentage, if the smaller box is less than this fraction in area of the bigger box, it will be considered.
@@ -29,8 +28,8 @@ parser.add_argument("--max-distance", dest="maxDistance", type=int, default=maxD
 parser.add_argument("--max-area-diff", dest="maxAreaDiff", type=float, default=maxPctAreaDifference, help="The maximum change in area between two boxes for them to be considered as the same box")
 parser.add_argument("--min-time", dest="minTime", type=float, default=minTimeBetweenPlays, help="The minimum time between consecutive playback of the same sound")
 parser.add_argument("--required-distance", dest="requiredDistance", type=int, default=requiredDistanceToActivate, help="The amount of movement in 1080p pixels to activate a sound")
-parser.add_argument("--pos-cutoff", dest="posCutoff", type=int, default=posDirectionCutoff, help="The last point to count someone walking in the positive direction.  Smaller numbers are more sensitive.")
-parser.add_argument("--neg-cutoff", dest="negCutoff", type=int, default=negDirectionCutoff, help="The last point to count someone walking in the negative direction.  Bigger numbers are more sensitive.")
+parser.add_argument("--pos-cutoff", "--pos-range", dest="posCutoff", type=str, default="1080-1920", help="The last point to count someone walking in the positive direction.  Smaller numbers are more sensitive.")
+parser.add_argument("--neg-cutoff", "--neg-range", dest="negCutoff", type=str, default="0-840", help="The last point to count someone walking in the negative direction.  Bigger numbers are more sensitive.")
 parser.add_argument("--reverse", "-r", dest="reverse", action="store_true", help="Reverse the directions needed for action sounds")
 parser.add_argument("--verbose", "-v", dest="verbose", action="store_true", help="Verbose mode")
 parser.add_argument("--live", "-l", dest="live", action="store_true", help="Enables live camera feed window")
@@ -93,8 +92,8 @@ maxDistanceDifference *= widthModifier
 minSize *= areaModifier
 requiredDistanceToActivate *= widthModifier
 minHeight *= heightModifier
-posDirectionCutoff *= widthModifier
-negDirectionCutoff *= widthModifier
+posDirectionCutoff = FloatRange.fromStringWithDefaults(args.posCutoff, high=1920) * widthModifier
+negDirectionCutoff = FloatRange.fromStringWithDefaults(args.negCutoff, low=0) * widthModifier
 
 bgsub = cv.bgsegm.createBackgroundSubtractorMOG(history=1000)
 
@@ -102,13 +101,14 @@ lastContours = []
 lastPlay = 0
 
 class ChangeTracker:
-	def __init__(self, distanceToActivate, minTimeBetweenPlays):
+	def __init__(self, distanceToActivate, minTimeBetweenPlays, cutoff: FloatRange):
 		self.distanceToActivate = distanceToActivate
 		self.minTimeBetweenPlays = minTimeBetweenPlays
 		self.OKStart = time.time()
 		self.lastPlay = 0
 		self.totalDist = 0
 		self.pos = 0
+		self.cutoff = cutoff
 
 	def update(self, distance, pos):
 		if distance == 0:
@@ -126,19 +126,19 @@ class ChangeTracker:
 		if (time.time() - self.lastPlay) < self.minTimeBetweenPlays:
 			return False
 		if dist > target:
-			if target < 0 and self.pos < negDirectionCutoff or target > 0 and self.pos > posDirectionCutoff:
+			if self.pos not in self.cutoff:
 				if verbose:
-					if target < 0:
-						print("Negative Cutoff, {0} < {1}".format(self.pos, negDirectionCutoff))
-					else:
-						print("Positive Cutoff, {0} > {1}".format(self.pos, posDirectionCutoff))
-					return False
+					name = "Negative" if self.distanceToActivate < 0 else "Positive"
+					print("{0} Cutoff, {1} not in {2}".format(name, self.pos, self.cutoff))
+				return False
 			self.lastPlay = time.time()
 			return True
 		else:
 			return False
-negTracker = ChangeTracker(-requiredDistanceToActivate, minTimeBetweenPlays)
-posTracker = ChangeTracker(requiredDistanceToActivate, minTimeBetweenPlays)
+
+
+negTracker = ChangeTracker(-requiredDistanceToActivate, minTimeBetweenPlays, negDirectionCutoff)
+posTracker = ChangeTracker(requiredDistanceToActivate, minTimeBetweenPlays, posDirectionCutoff)
 
 # Compare two images and return a array of interesting looking boxes (spots with large amounts of movement)
 def compareImages(img1, img2):
@@ -194,7 +194,7 @@ def checkAndPlaySound():
 		posTracker.update(0, 0)
 		negTracker.update(0, 0)
 
-def addColoredBox(img, x0, x1, y0, y1, color, alpha):
+def addColoredBox(img, x0: int, x1: int, y0: int, y1: int, color: Tuple[int, int, int], alpha: float):
 	box = img.copy()
 	cv.rectangle(box, (x0, y0), (x1, y1), color, -1)
 	cv.addWeighted(box, alpha, img, 1-alpha, 0, img)
@@ -239,8 +239,8 @@ while True:
 	lastContours = contours
 
 	if shouldCamera:
-		addColoredBox(img, int(posDirectionCutoff), int(videoWidth), 0, int(videoHeight), (0, 0, 255), 0.1)
-		addColoredBox(img, 0, int(negDirectionCutoff), 0, int(videoHeight), (0, 255, 255), 0.1)
+		addColoredBox(img, int(posDirectionCutoff.low), int(posDirectionCutoff.high), 0, int(videoHeight), (0, 0, 255), 0.1)
+		addColoredBox(img, int(negDirectionCutoff.low), int(negDirectionCutoff.high), 0, int(videoHeight), (0, 255, 255), 0.1)
 		cv.imshow("Final", img)
 		key = cv.waitKey(1) & 0xFF
 		if key == ord("q"):
