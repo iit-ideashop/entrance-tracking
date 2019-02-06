@@ -4,7 +4,7 @@ from typing import Union, Optional
 class FloatRange:
 	def __init__(self, low: float, high: float):
 		if low > high:
-			raise ValueError(f"Tried to create a FloatRange with low {low} greater than high {high}")
+			raise ValueError("Tried to create a FloatRange with low {0} greater than high {0}".format(low, high))
 		self.low: float = low
 		self.high: float = high
 
