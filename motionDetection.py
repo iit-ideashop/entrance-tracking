@@ -43,6 +43,7 @@ minHeight = args.minHeight
 minSize = args.minSize
 minTimeBetweenPlays = args.minTime
 requiredDistanceToActivate = args.requiredDistance
+temporaryImageIDNumber = 0
 
 # Pass camera as first program argument
 try:
@@ -185,6 +186,7 @@ def areSimilar(box1, box2):
 
 # Decide whether or not a sound should be played
 def checkAndPlaySound():
+	global temporaryImageIDNumber
 	if posTracker.shouldActivate():
 		playSoundMovingPositive()
 		posTracker.update(0, 0)
@@ -193,6 +195,13 @@ def checkAndPlaySound():
 		playSoundMovingNegative()
 		posTracker.update(0, 0)
 		negTracker.update(0, 0)
+	else:
+		return
+	posTracker.update(0, 0)
+	negTracker.update(0, 0)
+	cv.imwrite("/tmp/Capture{0}.png".format(temporaryImageIDNumber), img)
+	cv.imwrite("/tmp/BGSub{0}.png".format(temporaryImageIDNumber), afterBGSub)
+	temporaryImageIDNumber = (temporaryImageIDNumber + 1) % 10
 
 def addColoredBox(img, x0: int, x1: int, y0: int, y1: int, color: Tuple[int, int, int], alpha: float):
 	box = img.copy()
@@ -205,9 +214,10 @@ while True:
 		break
 
 	afterBGSub = bgsub.apply(img)
-	afterBGSub = cv.dilate(afterBGSub, None, iterations=int(8*widthModifier))
-	if shouldCamera: cv.imshow("No BG", afterBGSub)
-	contours = [contour for contour in cv.findContours(afterBGSub, cv.RETR_EXTERNAL,
+	bgSubProcessed = cv.erode(afterBGSub, None, iterations=int(4*widthModifier))
+	bgSubProcessed = cv.dilate(bgSubProcessed, None, iterations=int(8*widthModifier))
+	if shouldCamera: cv.imshow("No BG", bgSubProcessed)
+	contours = [contour for contour in cv.findContours(bgSubProcessed, cv.RETR_EXTERNAL,
 		cv.CHAIN_APPROX_SIMPLE)[1] if cv.contourArea(contour) > minSize]
 
 	for contour in contours:
@@ -238,9 +248,9 @@ while True:
 
 	lastContours = contours
 
+	addColoredBox(img, int(posDirectionCutoff.low), int(posDirectionCutoff.high), 0, int(videoHeight), (0, 0, 255), 0.1)
+	addColoredBox(img, int(negDirectionCutoff.low), int(negDirectionCutoff.high), 0, int(videoHeight), (0, 255, 255), 0.1)
 	if shouldCamera:
-		addColoredBox(img, int(posDirectionCutoff.low), int(posDirectionCutoff.high), 0, int(videoHeight), (0, 0, 255), 0.1)
-		addColoredBox(img, int(negDirectionCutoff.low), int(negDirectionCutoff.high), 0, int(videoHeight), (0, 255, 255), 0.1)
 		cv.imshow("Final", img)
 		key = cv.waitKey(1) & 0xFF
 		if key == ord("q"):
