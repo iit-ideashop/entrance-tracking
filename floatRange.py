@@ -11,7 +11,7 @@ class FloatRange:
 	@staticmethod
 	def fromStringWithDefaults(string: str, low: Optional[float] = None, high: Optional[float] = None) -> "FloatRange":
 		pieces = string.split("-")
-		if str == "":
+		if string == "":
 			if low is not None and high is not None:
 				return FloatRange(low, high)
 			else:
